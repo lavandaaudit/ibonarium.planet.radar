@@ -7,7 +7,6 @@
     <meta name="robots" content="noindex,nofollow">
     <title>IBONARIUM PLANET RADAR</title>
     <style>
-        /* ================= RESET & BODY ================= */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
             width: 100%;
@@ -17,19 +16,16 @@
             font-family: "Courier New", monospace;
             overflow: hidden;
         }
-        /* ================= STARS BACKGROUND ================= */
         #starsCanvas {
             position: fixed;
             inset: 0;
             z-index: 0;
         }
-        /* ================= MAP CANVAS ================= */
         #mapCanvas {
             position: fixed;
             inset: 0;
             z-index: 1;
         }
-        /* ================= WRAPPER (внизу) ================= */
         .wrapper {
             position: fixed;
             bottom: 15px;
@@ -43,7 +39,6 @@
             padding: 8px;
             pointer-events: none;
         }
-        /* ================= CITY MARKERS ================= */
         .city-markers {
             display: flex;
             flex-direction: column;
@@ -62,7 +57,6 @@
             letter-spacing: 1.2px;
             opacity: 0.9;
         }
-        /* ================= CONTROLS ================= */
         .controls {
             display: flex;
             flex-wrap: wrap;
@@ -92,7 +86,6 @@
             color: #000;
             box-shadow: 0 0 18px #4dd2ff;
         }
-        /* ================= TEXT ================= */
         .text-block {
             display: flex;
             flex-direction: column;
@@ -118,7 +111,6 @@
             color: #4dd2ff;
             text-decoration: underline;
         }
-        /* ================= MOBILE ================= */
         @media (max-width: 600px) {
             button {
                 font-size: 10px;
@@ -139,13 +131,11 @@
     <canvas id="mapCanvas"></canvas>
 
     <div class="wrapper">
-        <!-- Блок міст -->
         <div class="city-markers">
             <div class="title">РАДАР МІСТ</div>
             <div class="data-line" id="city-data">ЗАВАНТАЖЕННЯ...</div>
         </div>
 
-        <!-- Кнопки перемикання шарів -->
         <div class="controls">
             <button class="layerBtn active" data-layer="clouds_new">ХМАРИ</button>
             <button class="layerBtn" data-layer="temp_new">ТЕМПЕРАТУРА</button>
@@ -157,7 +147,6 @@
             <button class="layerBtn" data-layer="rain_new">ДОЩ</button>
         </div>
 
-        <!-- Текстова інформація -->
         <div class="text-block">
             <div class="main-text" id="status">СКАНУВАННЯ...</div>
             <div class="sub-text">
@@ -174,7 +163,6 @@
     </div>
 
     <script>
-        /* ================= STARS BACKGROUND ================= */
         const starsCanvas = document.getElementById("starsCanvas");
         const sctx = starsCanvas.getContext("2d");
         let W = starsCanvas.width = window.innerWidth;
@@ -204,7 +192,6 @@
         }
         drawStars();
 
-        /* ================= MAP RADAR ================= */
         const API_KEY = "b99fdb51e2dcc8e0549f8b99ef20cedd";
         const ZOOM = 2;
         const TILE_SIZE = 256;
@@ -305,21 +292,22 @@
                     const th = TILE_SIZE * scale;
 
                     const base = baseTiles[`${x}_${y}`];
-                    if (base) ctx.drawImage(base, bx, by, tw, th);
+                    if (base) {
+                        // Приглушуємо базову карту (Землю)
+                        ctx.globalAlpha = 0.5;  // можна змінити на 0.4 або 0.6
+                        ctx.drawImage(base, bx, by, tw, th);
+                        ctx.globalAlpha = 1.0;
+                    }
 
                     const layer = layerTiles[`${currentLayer}_${x}_${y}`];
                     if (layer) {
-                        // ПІДВИЩЕНИЙ КОНТРАСТ: малюємо шар з повною непрозорістю
-                        if (currentLayer !== "relief") {  // рельєф і так щільний
-                            ctx.globalAlpha = 1.0;
-                        }
+                        // Погодні шари — повна яскравість і контраст
+                        ctx.globalAlpha = 1.0;
                         ctx.drawImage(layer, bx, by, tw, th);
-                        ctx.globalAlpha = 1.0; // скидаємо на всяк випадок
                     }
                 }
             }
 
-            // Сканлайн ефект
             const time = Date.now() * 0.001;
             ctx.fillStyle = `rgba(77,210,255,${0.05 + 0.03 * Math.sin(time * 3)})`;
             ctx.fillRect(0, H * ((time * 0.5) % 1), W, 3);
