@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!DOCTYPE html>
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
@@ -153,6 +153,8 @@
             <button class="layerBtn" data-layer="wind_new">ВІТЕР</button>
             <button class="layerBtn" data-layer="pressure_new">ТИСК</button>
             <button class="layerBtn" data-layer="relief">РЕЛЬЄФ</button>
+            <button class="layerBtn" data-layer="snow_new">СНІГ</button>
+            <button class="layerBtn" data-layer="rain_new">ДОЩ</button>
         </div>
 
         <!-- Текстова інформація -->
@@ -244,7 +246,6 @@
             const key = `${currentLayer}_${x}_${y}`;
             if (layerTiles[key]) return layerTiles[key];
             let url = `https://tile.openweathermap.org/map/${currentLayer}/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
-            if (currentLayer === "relief") url = `https://tile.openweathermap.org/map/relief/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
             const img = new Image();
             img.crossOrigin = "anonymous";
             return new Promise(resolve => {
@@ -271,8 +272,11 @@
             renderMap();
             await renderCityMarkers();
 
-            const layerName = currentLayer.replace('_new', '').toUpperCase();
-            statusEl.textContent = `РАДАР: ${layerName === 'RELIEF' ? 'РЕЛЬЄФ' : layerName} АКТИВНИЙ`;
+            let layerName = currentLayer.replace('_new', '').toUpperCase();
+            if (layerName === 'RELIEF') layerName = 'РЕЛЬЄФ';
+            if (layerName === 'SNOW') layerName = 'СНІГ';
+            if (layerName === 'RAIN') layerName = 'ДОЩ';
+            statusEl.textContent = `РАДАР: ${layerName} АКТИВНИЙ`;
             lastUpdate = Date.now();
         }
 
@@ -282,18 +286,16 @@
             const tilesCount = 1 << ZOOM;
             const fullMapSize = tilesCount * TILE_SIZE;
 
-            // Легке обрізання знизу (Антарктида трохи менше видно) — тільки 8%
-            const cropBottom = 0.2;
+            const cropBottom = 0.08;
             const visibleRows = Math.floor(tilesCount * (1 - cropBottom));
 
-            // Загальний масштаб трохи зменшено (на ~5%)
-            const scale = (W * 0.99) / fullMapSize;  // було 0.96, тепер 0.91
+            const scale = (W * 0.91) / fullMapSize;
 
             const mapWidth = fullMapSize * scale;
             const mapHeight = visibleRows * TILE_SIZE * scale;
 
             const offsetX = (W - mapWidth) / 2;
-            const offsetY = (H - mapHeight) / 2 - H * 0.15; // легкий зсув вгору
+            const offsetY = (H - mapHeight) / 2 - H * 0.03;
 
             for (let x = 0; x < tilesCount; x++) {
                 for (let y = 0; y < visibleRows; y++) {
@@ -310,7 +312,6 @@
                 }
             }
 
-            // Сканлайн ефект
             const time = Date.now() * 0.001;
             ctx.fillStyle = `rgba(77,210,255,${0.05 + 0.03 * Math.sin(time * 3)})`;
             ctx.fillRect(0, H * ((time * 0.5) % 1), W, 3);
@@ -363,5 +364,3 @@
     </script>
 </body>
 </html>
-
-
