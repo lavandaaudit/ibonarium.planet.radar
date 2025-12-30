@@ -28,14 +28,13 @@
         }
         .map-container {
             width:100%; max-width:900px; height:70vh;
-            background:rgba(0,20,40,0.8);
+            background:#000;
             border:1px solid rgba(0,255,136,0.3);
             box-shadow:0 0 30px rgba(0,255,136,0.2);
-            position:relative;
+            position:relative; overflow:hidden;
         }
         #map-canvas {
-            width:100%; height:100%; image-rendering:-webkit-optimize-contrast;
-            image-rendering:-moz-crisp-edges; image-rendering:pixelated;
+            width:100%; height:100%;
         }
         .controls {
             display:flex; gap:12px; flex-wrap:wrap; justify-content:center;
@@ -46,12 +45,10 @@
             color:#00ff88; padding:8px 16px;
             font-size:12px; letter-spacing:1.5px;
             cursor:pointer; transition:.3s;
-            backdrop-filter:blur(10px);
         }
         button:hover {
             background:rgba(0,255,136,0.1);
             box-shadow:0 0 15px rgba(0,255,136,0.5);
-            border-color:rgba(0,255,136,0.8);
         }
         button.active {
             background:rgba(0,255,136,0.2);
@@ -60,7 +57,6 @@
         }
         .status {
             font-size:12px; letter-spacing:2px; opacity:0.6;
-            text-shadow:0 0 4px rgba(0,255,136,0.3);
         }
     </style>
 </head>
@@ -80,7 +76,7 @@
         <button data-layer="wind_new">WIND</button>
     </div>
     
-    <p class="status" id="status">SCANNING PLANETARY ATMOSPHERE...</p>
+    <p class="status" id="status">SCANNING...</p>
 </div>
 
 <script>
@@ -92,20 +88,17 @@
         SW = starsC.width = innerWidth;
         SH = starsC.height = innerHeight;
         stars = Array.from({length:120}, () => ({
-            x: Math.random() * SW,
-            y: Math.random() * SH,
-            z: Math.random() * SW,
-            speed: 0.05 + Math.random() * 0.1
+            x: Math.random() * SW, y: Math.random() * SH, z: Math.random() * SW
         }));
     }
     resizeStars();
     window.addEventListener("resize", resizeStars);
     function drawStars() {
-        starsCtx.fillStyle = "rgba(0,0,0,0.12)";
+        starsCtx.fillStyle = "rgba(0,0,0,0.1)";
         starsCtx.fillRect(0, 0, SW, SH);
         starsCtx.fillStyle = "#00ff88";
         stars.forEach(st => {
-            st.z -= st.speed;
+            st.z -= 0.08;
             if (st.z <= 0) st.z = SW;
             const k = 120 / st.z;
             const x = (st.x - SW / 2) * k + SW / 2;
@@ -121,135 +114,126 @@
     }
     drawStars();
 
-    /* MAP RADAR */
+    /* MAP RADAR WITH DARK BASEMAP */
     const API_KEY = "b99fdb51e2dcc8e0549f8b99ef20cedd";
     const ZOOM = 2;
     const TILE_SIZE = 256;
     const canvas = document.getElementById("map-canvas");
     const ctx = canvas.getContext("2d");
     let currentLayer = "clouds_new";
-    let tiles = {};
+    let baseTiles = {}; // для базової карти
+    let weatherTiles = {};
     let lastUpdate = 0;
-    const UPDATE_INTERVAL = 15 * 60 * 1000; // 15 хвилин
+    const UPDATE_INTERVAL = 15 * 60 * 1000;
+
+    // Темна базова карта (Stamen Toner Lite — чорно-біла, ідеально під кіберпанк)
+    const BASE_URL = "https://stamen-tiles.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}.png";
 
     function resizeMap() {
-        canvas.width = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
-        if (Object.keys(tiles).length > 0) renderMap();
+        canvas.width = canvas.offsetWidth * devicePixelRatio;
+        canvas.height = canvas.offsetHeight * devicePixelRatio;
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+        canvas.style.width = canvas.offsetWidth / devicePixelRatio + 'px';
+        canvas.style.height = canvas.offsetHeight / devicePixelRatio + 'px';
+        renderMap();
     }
     window.addEventListener("resize", resizeMap);
 
-    async function fetchTile(layer, x, y) {
-        const key = `${layer}_${x}_${y}`;
-        if (tiles[key]) return tiles[key];
-        
+    async function fetchBaseTile(x, y) {
+        const key = `${x}_${y}`;
+        if (baseTiles[key]) return baseTiles[key];
         try {
-            const url = `https://tile.openweathermap.org/map/${layer}/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
-            const response = await fetch(url);
-            if (response.ok) {
-                const blob = await response.blob();
-                const img = new Image();
-                img.crossOrigin = "anonymous";
-                return new Promise((resolve) => {
-                    img.onload = () => {
-                        tiles[key] = img;
-                        resolve(img);
-                    };
-                    img.onerror = () => resolve(null);
-                    img.src = URL.createObjectURL(blob);
-                });
-            }
-        } catch (e) {
-            console.error("Tile fetch error:", e);
-        }
-        return null;
+            const url = BASE_URL.replace('{z}', ZOOM).replace('{x}', x).replace('{y}', y);
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            return new Promise(resolve => {
+                img.onload = () => { baseTiles[key] = img; resolve(img); };
+                img.src = url;
+            });
+        } catch { return null; }
     }
 
-    async function loadMap(layer) {
+    async function fetchWeatherTile(x, y) {
+        const key = `${x}_${y}`;
+        if (weatherTiles[key]) return weatherTiles[key];
+        try {
+            const url = `https://tile.openweathermap.org/map/${currentLayer}/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            return new Promise(resolve => {
+                img.onload = () => { weatherTiles[key] = img; resolve(img); };
+                img.onerror = () => resolve(null);
+                img.src = url;
+            });
+        } catch { return null; }
+    }
+
+    async function loadMap() {
         const statusEl = document.getElementById("status");
-        statusEl.textContent = "LOADING PLANETARY DATA...";
-        
-        const tilesCount = 1 << ZOOM; // 4 tiles
-        const promises = [];
-        
+        statusEl.textContent = "SCANNING PLANET...";
+
+        const tilesCount = 1 << ZOOM;
+        const basePromises = [];
+        const weatherPromises = [];
+
         for (let x = 0; x < tilesCount; x++) {
             for (let y = 0; y < tilesCount; y++) {
-                promises.push(fetchTile(layer, x, y));
+                basePromises.push(fetchBaseTile(x, y));
+                weatherPromises.push(fetchWeatherTile(x, y));
             }
         }
-        
-        try {
-            await Promise.all(promises);
-            renderMap();
-            statusEl.textContent = `PLANET RADAR: ${layer.toUpperCase().replace('_new', '')} LAYER ACTIVE`;
-            lastUpdate = Date.now();
-        } catch (e) {
-            statusEl.textContent = "RADAR SCAN FAILED";
-        }
+
+        await Promise.all([...basePromises, ...weatherPromises]);
+        renderMap();
+        statusEl.textContent = `RADAR: ${currentLayer.replace('_new','').toUpperCase()} ACTIVE`;
+        lastUpdate = Date.now();
     }
 
     function renderMap() {
-        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         const tilesCount = 1 << ZOOM;
-        const mapSize = TILE_SIZE * tilesCount;
-        
-        // Render tiles
+        const tilePixelSize = canvas.width / tilesCount / devicePixelRatio;
+
         for (let x = 0; x < tilesCount; x++) {
             for (let y = 0; y < tilesCount; y++) {
-                const tile = tiles[`${currentLayer}_${x}_${y}`];
-                if (tile) {
-                    ctx.drawImage(tile, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                }
+                const bx = x * tilePixelSize;
+                const by = y * tilePixelSize;
+
+                // Базова карта (темна)
+                const base = baseTiles[`${x}_${y}`];
+                if (base) ctx.drawImage(base, bx, by, tilePixelSize, tilePixelSize);
+
+                // Погодний шар
+                const weather = weatherTiles[`${x}_${y}`];
+                if (weather) ctx.drawImage(weather, bx, by, tilePixelSize, tilePixelSize);
             }
         }
-        
-        // Cyberpunk overlay grid
-        ctx.strokeStyle = "rgba(0,255,136,0.1)";
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= canvas.width; i += 40) {
-            ctx.beginPath();
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i, canvas.height);
-            ctx.stroke();
-        }
-        for (let i = 0; i <= canvas.height; i += 40) {
-            ctx.beginPath();
-            ctx.moveTo(0, i);
-            ctx.lineTo(canvas.width, i);
-            ctx.stroke();
-        }
-        
-        // Radar scanline effect
+
+        // Кіберпанк сканлайн
         const time = Date.now() * 0.001;
-        ctx.fillStyle = `rgba(0,255,136,${0.03 + 0.02 * Math.sin(time)}`;
-        ctx.fillRect(0, 0, canvas.width, 2);
+        ctx.fillStyle = `rgba(0,255,136,${0.05 + 0.03 * Math.sin(time * 3)})`;
+        ctx.fillRect(0, (canvas.height / devicePixelRatio) * (time % 1), canvas.width / devicePixelRatio, 3);
     }
 
-    // Controls
     document.querySelectorAll('button[data-layer]').forEach(btn => {
         btn.addEventListener('click', async () => {
-            const layer = btn.dataset.layer;
-            if (layer !== currentLayer) {
-                document.querySelector('.active').classList.remove('active');
-                btn.classList.add('active');
-                currentLayer = layer;
-                await loadMap(layer);
-            }
+            if (btn.dataset.layer === currentLayer) return;
+            document.sinaquerySelector('.active')?.classList.remove('active');
+            btn.classList.add('active');
+            currentLayer = btn.dataset.layer;
+            weatherTiles = {}; // очищаємо кеш погоди
+            await loadMap();
         });
     });
 
-    /* AUTO UPDATE */
     async function autoUpdate() {
-        if (Date.now() - lastUpdate > UPDATE_INTERVAL) {
-            await loadMap(currentLayer);
-        }
+        if (Date.now() - lastUpdate > UPDATE_INTERVAL) await loadMap();
+        renderMap(); // для анімації сканлайну
         requestAnimationFrame(autoUpdate);
     }
 
-    /* INIT */
-    canvas.addEventListener('load', resizeMap);
     resizeMap();
-    loadMap("clouds_new");
+    loadMap();
     autoUpdate();
 </script>
 </body>
