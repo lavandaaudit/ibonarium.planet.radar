@@ -215,7 +215,7 @@
         let baseTiles = {};
         let layerTiles = {};
         let lastUpdate = 0;
-        const UPDATE_INTERVAL = 15 * 60 * 1000; // 15 хвилин
+        const UPDATE_INTERVAL = 15 * 60 * 1000;
 
         const BASE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
@@ -282,20 +282,21 @@
             const tilesCount = 1 << ZOOM;
             const fullMapSize = tilesCount * TILE_SIZE;
 
-            // Прямокутна карта: заповнюємо всю ширину, а висоту — частково (приблизно 65%)
-            const targetHeightRatio = 0.65; // карта займає 65% висоти екрану
-            const scaleX = W / fullMapSize * 0.96; // невеликі відступи по боках
-            const scaleY = (H * targetHeightRatio) / fullMapSize;
-            const scale = Math.min(scaleX, scaleY);
+            // Обрізаємо Антарктиду знизу на ~15%
+            const cropBottom = 0.15;
+            const visibleRows = Math.floor(tilesCount * (1 - cropBottom));
+
+            // Масштабуємо по ширині екрану з невеликими відступами
+            const scale = (W * 0.96) / fullMapSize;
 
             const mapWidth = fullMapSize * scale;
-            const mapHeight = fullMapSize * scale;
+            const mapHeight = visibleRows * TILE_SIZE * scale;
 
             const offsetX = (W - mapWidth) / 2;
-            const offsetY = (H - mapHeight) / 2;
+            const offsetY = (H - mapHeight) / 2 - H * 0.05; // трошки вгору для балансу
 
             for (let x = 0; x < tilesCount; x++) {
-                for (let y = 0; y < tilesCount; y++) {
+                for (let y = 0; y < visibleRows; y++) {
                     const bx = offsetX + x * TILE_SIZE * scale;
                     const by = offsetY + y * TILE_SIZE * scale;
                     const tw = TILE_SIZE * scale;
@@ -331,7 +332,6 @@
             container.textContent = cityTexts.join('  │  ');
         }
 
-        // Перемикання шарів
         document.querySelectorAll('.layerBtn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 if (btn.dataset.layer === currentLayer) return;
@@ -343,7 +343,6 @@
             });
         });
 
-        // Автооновлення та анімація
         async function autoUpdate() {
             if (Date.now() - lastUpdate > UPDATE_INTERVAL) {
                 layerTiles = {};
@@ -353,14 +352,12 @@
             requestAnimationFrame(autoUpdate);
         }
 
-        // Ресайз
         window.addEventListener("resize", () => {
             W = starsCanvas.width = mapCanvas.width = window.innerWidth;
             H = starsCanvas.height = mapCanvas.height = window.innerHeight;
             renderMap();
         });
 
-        // Старт
         loadMap();
         autoUpdate();
     </script>
