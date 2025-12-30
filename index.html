@@ -33,9 +33,7 @@
             box-shadow:0 0 30px rgba(0,255,136,0.2);
             position:relative; overflow:hidden;
         }
-        #map-canvas {
-            width:100%; height:100%;
-        }
+        #map-canvas { width:100%; height:100%; }
         .controls {
             display:flex; gap:12px; flex-wrap:wrap; justify-content:center;
         }
@@ -58,6 +56,16 @@
         .status {
             font-size:12px; letter-spacing:2px; opacity:0.6;
         }
+        .city-markers {
+            position:absolute; top:10px; left:10px; z-index:10;
+            display:flex; flex-direction:column; gap:8px;
+        }
+        .city {
+            background:rgba(0,0,0,0.6); padding:4px 8px;
+            border:1px solid rgba(0,255,136,0.4);
+            font-size:11px; letter-spacing:1px;
+            box-shadow:0 0 10px rgba(0,255,136,0.3);
+        }
     </style>
 </head>
 <body>
@@ -67,6 +75,7 @@
     
     <div class="map-container">
         <canvas id="map-canvas"></canvas>
+        <div class="city-markers" id="city-markers"></div>
     </div>
     
     <div class="controls">
@@ -74,6 +83,8 @@
         <button data-layer="temp_new">TEMP</button>
         <button data-layer="precipitation_new">PRECIP</button>
         <button data-layer="wind_new">WIND</button>
+        <button data-layer="pressure_new">PRESSURE</button>
+        <button data-layer="relief">RELIEF</button>
     </div>
     
     <p class="status" id="status">SCANNING...</p>
@@ -114,58 +125,68 @@
     }
     drawStars();
 
-    /* MAP RADAR WITH DARK BASEMAP */
+    /* MAP RADAR — тепер шари НЕ накладаються, а замінюють один одного */
     const API_KEY = "b99fdb51e2dcc8e0549f8b99ef20cedd";
     const ZOOM = 2;
     const TILE_SIZE = 256;
     const canvas = document.getElementById("map-canvas");
     const ctx = canvas.getContext("2d");
     let currentLayer = "clouds_new";
-    let baseTiles = {}; // для базової карти
-    let weatherTiles = {};
+    let baseTiles = {};     // темна спутникова база
+    let layerTiles = {};    // тільки поточний шар
     let lastUpdate = 0;
     const UPDATE_INTERVAL = 15 * 60 * 1000;
 
-    // Темна базова карта (Stamen Toner Lite — чорно-біла, ідеально під кіберпанк)
-    const BASE_URL = "https://stamen-tiles.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}.png";
+    // Темна спутникова база (Esri WorldImagery)
+    const BASE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+
+    // Міста для маркерів
+    const cities = [
+        {name: "KYIV", lat: 50.45, lon: 30.52},
+        {name: "TOKYO", lat: 35.68, lon: 139.76},
+        {name: "NIGHT CITY", lat: 37.77, lon: -122.42},
+        {name: "MOSCOW", lat: 55.75, lon: 37.62},
+        {name: "BERLIN", lat: 52.52, lon: 13.40}
+    ];
 
     function resizeMap() {
         canvas.width = canvas.offsetWidth * devicePixelRatio;
         canvas.height = canvas.offsetHeight * devicePixelRatio;
         ctx.scale(devicePixelRatio, devicePixelRatio);
-        canvas.style.width = canvas.offsetWidth / devicePixelRatio + 'px';
-        canvas.style.height = canvas.offsetHeight / devicePixelRatio + 'px';
         renderMap();
+        renderCityMarkers();
     }
     window.addEventListener("resize", resizeMap);
 
     async function fetchBaseTile(x, y) {
         const key = `${x}_${y}`;
         if (baseTiles[key]) return baseTiles[key];
-        try {
-            const url = BASE_URL.replace('{z}', ZOOM).replace('{x}', x).replace('{y}', y);
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            return new Promise(resolve => {
-                img.onload = () => { baseTiles[key] = img; resolve(img); };
-                img.src = url;
-            });
-        } catch { return null; }
+        const url = BASE_URL.replace('{z}', ZOOM).replace('{x}', x).replace('{y}', y);
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        return new Promise(resolve => {
+            img.onload = () => { baseTiles[key] = img; resolve(img); };
+            img.onerror = () => resolve(null);
+            img.src = url;
+        });
     }
 
-    async function fetchWeatherTile(x, y) {
-        const key = `${x}_${y}`;
-        if (weatherTiles[key]) return weatherTiles[key];
-        try {
-            const url = `https://tile.openweathermap.org/map/${currentLayer}/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            return new Promise(resolve => {
-                img.onload = () => { weatherTiles[key] = img; resolve(img); };
-                img.onerror = () => resolve(null);
-                img.src = url;
-            });
-        } catch { return null; }
+    async function fetchLayerTile(x, y) {
+        const key = `${currentLayer}_${x}_${y}`;
+        if (layerTiles[key]) return layerTiles[key];
+
+        let url = `https://tile.openweathermap.org/map/${currentLayer}/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
+        if (currentLayer === "relief") {
+            url = `https://tile.openweathermap.org/map/relief/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
+        }
+
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        return new Promise(resolve => {
+            img.onload = () => { layerTiles[key] = img; resolve(img); };
+            img.onerror = () => resolve(null);
+            img.src = url;
+        });
     }
 
     async function loadMap() {
@@ -173,20 +194,60 @@
         statusEl.textContent = "SCANNING PLANET...";
 
         const tilesCount = 1 << ZOOM;
-        const basePromises = [];
-        const weatherPromises = [];
+        const promises = [];
 
+        // Завантажуємо базу (один раз)
         for (let x = 0; x < tilesCount; x++) {
             for (let y = 0; y < tilesCount; y++) {
-                basePromises.push(fetchBaseTile(x, y));
-                weatherPromises.push(fetchWeatherTile(x, y));
+                promises.push(fetchBaseTile(x, y));
             }
         }
 
-        await Promise.all([...basePromises, ...weatherPromises]);
+        // Очищаємо попередній шар і завантажуємо новий
+        layerTiles = {};
+        for (let x = 0; x < tilesCount; x++) {
+            for (let y = 0; y < tilesCount; y++) {
+                promises.push(fetchLayerTile(x, y));
+            }
+        }
+
+        await Promise.all(promises);
         renderMap();
+        renderCityMarkers();
         statusEl.textContent = `RADAR: ${currentLayer.replace('_new','').toUpperCase()} ACTIVE`;
         lastUpdate = Date.now();
+    }
+
+    function latLonToPixel(lat, lon) {
+        const tilesCount = 1 << ZOOM;
+        const x = (lon + 180) / 360 * tilesCount * TILE_SIZE;
+        const y = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * tilesCount * TILE_SIZE;
+        return {
+            x: (x / (tilesCount * TILE_SIZE)) * canvas.width / devicePixelRatio,
+            y: (y / (tilesCount * TILE_SIZE)) * canvas.height / devicePixelRatio
+        };
+    }
+
+    async function fetchCityWeather(city) {
+        try {
+            const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${city.lat}&lon=${city.lon}&appid=${API_KEY}&units=metric`);
+            const data = await res.json();
+            return `${city.name}: ${Math.round(data.main.temp)}°C`;
+        } catch {
+            return `${city.name}: —`;
+        }
+    }
+
+    async function renderCityMarkers() {
+        const container = document.getElementById("city-markers");
+        container.innerHTML = "";
+        for (const city of cities) {
+            const text = await fetchCityWeather(city);
+            const div = document.createElement("div");
+            div.className = "city";
+            div.textContent = text;
+            container.appendChild(div);
+        }
     }
 
     function renderMap() {
@@ -199,36 +260,39 @@
                 const bx = x * tilePixelSize;
                 const by = y * tilePixelSize;
 
-                // Базова карта (темна)
+                // Спутникова база завжди
                 const base = baseTiles[`${x}_${y}`];
                 if (base) ctx.drawImage(base, bx, by, tilePixelSize, tilePixelSize);
 
-                // Погодний шар
-                const weather = weatherTiles[`${x}_${y}`];
-                if (weather) ctx.drawImage(weather, bx, by, tilePixelSize, tilePixelSize);
+                // ТІЛЬКИ один вибраний шар (без накладання)
+                const layer = layerTiles[`${currentLayer}_${x}_${y}`];
+                if (layer) ctx.drawImage(layer, bx, by, tilePixelSize, tilePixelSize);
             }
         }
 
-        // Кіберпанк сканлайн
+        // Сканлайн
         const time = Date.now() * 0.001;
         ctx.fillStyle = `rgba(0,255,136,${0.05 + 0.03 * Math.sin(time * 3)})`;
-        ctx.fillRect(0, (canvas.height / devicePixelRatio) * (time % 1), canvas.width / devicePixelRatio, 3);
+        ctx.fillRect(0, (canvas.height / devicePixelRatio) * ((time * 0.5) % 1), canvas.width / devicePixelRatio, 3);
     }
 
     document.querySelectorAll('button[data-layer]').forEach(btn => {
         btn.addEventListener('click', async () => {
             if (btn.dataset.layer === currentLayer) return;
-            document.sinaquerySelector('.active')?.classList.remove('active');
+            document.querySelector('.active')?.classList.remove('active');
             btn.classList.add('active');
             currentLayer = btn.dataset.layer;
-            weatherTiles = {}; // очищаємо кеш погоди
+            layerTiles = {}; // очищаємо тільки шар, база залишається
             await loadMap();
         });
     });
 
     async function autoUpdate() {
-        if (Date.now() - lastUpdate > UPDATE_INTERVAL) await loadMap();
-        renderMap(); // для анімації сканлайну
+        if (Date.now() - lastUpdate > UPDATE_INTERVAL) {
+            layerTiles = {};
+            await loadMap();
+        }
+        renderMap();
         requestAnimationFrame(autoUpdate);
     }
 
