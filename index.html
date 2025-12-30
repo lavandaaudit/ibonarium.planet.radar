@@ -14,57 +14,94 @@
             color:#00ff88;
             font-family:"Courier New",monospace;
             overflow:hidden;
+            touch-action:none; /* для плавного зуму/панорамування на мобілках */
         }
         canvas#stars { position:fixed; inset:0; z-index:0; }
         .wrapper {
             position:relative; z-index:2;
-            height:100%; padding:20px;
-            display:flex; flex-direction:column; gap:24px;
-            align-items:center; justify-content:center;
+            height:100%; padding:12px;
+            display:flex; flex-direction:column; gap:16px;
+            align-items:center;
         }
         h1 {
-            font-size:16px; letter-spacing:3px; opacity:0.7;
-            text-shadow:0 0 8px rgba(0,255,136,0.4);
+            font-size:14px; letter-spacing:2.5px; opacity:0.75;
+            text-shadow:0 0 6px rgba(0,255,136,0.4);
         }
         .map-container {
-            width:100%; max-width:900px; height:70vh;
+            width:100%; height:55vh;
             background:#000;
             border:1px solid rgba(0,255,136,0.3);
-            box-shadow:0 0 30px rgba(0,255,136,0.2);
+            box-shadow:0 0 20px rgba(0,255,136,0.2);
             position:relative; overflow:hidden;
+            touch-action:none;
         }
-        #map-canvas { width:100%; height:100%; }
+        #map-canvas {
+            width:100%; height:100%;
+            cursor:grab;
+            image-rendering:pixelated;
+        }
+        #map-canvas:active { cursor:grabbing; }
         .controls {
-            display:flex; gap:12px; flex-wrap:wrap; justify-content:center;
+            display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
         }
         button {
             background:rgba(0,40,60,0.8); 
             border:1px solid rgba(0,255,136,0.4);
-            color:#00ff88; padding:8px 16px;
-            font-size:12px; letter-spacing:1.5px;
+            color:#00ff88; padding:6px 12px;
+            font-size:11px; letter-spacing:1.2px;
             cursor:pointer; transition:.3s;
+            min-width:70px;
         }
-        button:hover {
-            background:rgba(0,255,136,0.1);
-            box-shadow:0 0 15px rgba(0,255,136,0.5);
+        button:hover, button:active {
+            background:rgba(0,255,136,0.15);
+            box-shadow:0 0 12px rgba(0,255,136,0.5);
         }
         button.active {
-            background:rgba(0,255,136,0.2);
-            box-shadow:0 0 20px rgba(0,255,136,0.6);
+            background:rgba(0,255,136,0.25);
+            box-shadow:0 0 15px rgba(0,255,136,0.6);
             color:#000;
         }
         .status {
-            font-size:12px; letter-spacing:2px; opacity:0.6;
+            font-size:11px; letter-spacing:1.8px; opacity:0.6;
         }
         .city-markers {
-            position:absolute; top:10px; left:10px; z-index:10;
-            display:flex; flex-direction:column; gap:8px;
+            position:absolute; top:6px; left:6px; z-index:10;
+            display:flex; flex-direction:column; gap:6px;
+            pointer-events:none; /* щоб не заважали панорамуванню */
         }
         .city {
-            background:rgba(0,0,0,0.6); padding:4px 8px;
+            background:rgba(0,0,0,0.7); padding:3px 6px;
             border:1px solid rgba(0,255,136,0.4);
-            font-size:11px; letter-spacing:1px;
-            box-shadow:0 0 10px rgba(0,255,136,0.3);
+            font-size:10px; letter-spacing:1px;
+            box-shadow:0 0 8px rgba(0,255,136,0.3);
+            white-space:nowrap;
+        }
+        .zoom-controls {
+            position:absolute; bottom:10px; right:10px; z-index:11;
+            display:flex; flex-direction:column; gap:4px;
+        }
+        .zoom-btn {
+            width:36px; height:36px;
+            background:rgba(0,40,60,0.8);
+            border:1px solid rgba(0,255,136,0.4);
+            color:#00ff88; font-size:18px; line-height:36px;
+            text-align:center; cursor:pointer;
+            transition:.3s;
+        }
+        .zoom-btn:hover { background:rgba(0,255,136,0.2); }
+        /* Мобільні оптимізації */
+        @media (max-width: 480px) {
+            .wrapper { padding:8px; gap:12px; }
+            h1 { font-size:13px; }
+            .map-container { height:50vh; }
+            .controls { gap:6px; }
+            button { padding:5px 10px; font-size:10px; min-width:60px; }
+            .status { font-size:10px; }
+            .city { font-size:9px; padding:2px 5px; }
+            .zoom-btn { width:32px; height:32px; font-size:16px; line-height:32px; }
+        }
+        @media (max-height: 600px) {
+            .map-container { height:45vh; }
         }
     </style>
 </head>
@@ -76,6 +113,10 @@
     <div class="map-container">
         <canvas id="map-canvas"></canvas>
         <div class="city-markers" id="city-markers"></div>
+        <div class="zoom-controls">
+            <div class="zoom-btn" id="zoom-in">+</div>
+            <div class="zoom-btn" id="zoom-out">-</div>
+        </div>
     </div>
     
     <div class="controls">
@@ -98,24 +139,25 @@
     function resizeStars() {
         SW = starsC.width = innerWidth;
         SH = starsC.height = innerHeight;
-        stars = Array.from({length:120}, () => ({
+        const count = innerWidth < 768 ? 60 : 120;
+        stars = Array.from({length: count}, () => ({
             x: Math.random() * SW, y: Math.random() * SH, z: Math.random() * SW
         }));
     }
     resizeStars();
     window.addEventListener("resize", resizeStars);
     function drawStars() {
-        starsCtx.fillStyle = "rgba(0,0,0,0.1)";
+        starsCtx.fillStyle = "rgba(0,0,0,0.08)";
         starsCtx.fillRect(0, 0, SW, SH);
         starsCtx.fillStyle = "#00ff88";
         stars.forEach(st => {
-            st.z -= 0.08;
+            st.z -= 0.06;
             if (st.z <= 0) st.z = SW;
-            const k = 120 / st.z;
+            const k = 100 / st.z;
             const x = (st.x - SW / 2) * k + SW / 2;
             const y = (st.y - SH / 2) * k + SH / 2;
             if (x > 0 && x < SW && y > 0 && y < SH) {
-                const size = (1 - st.z / SW) * 1.5;
+                const size = (1 - st.z / SW) * 1.2;
                 starsCtx.globalAlpha = 1 - st.z / SW;
                 starsCtx.fillRect(x, y, size, size);
             }
@@ -125,22 +167,26 @@
     }
     drawStars();
 
-    /* MAP RADAR — тепер шари НЕ накладаються, а замінюють один одного */
+    /* MAP RADAR З ЗУМОМ ТА ПАНОРАМУВАННЯМ */
     const API_KEY = "b99fdb51e2dcc8e0549f8b99ef20cedd";
-    const ZOOM = 2;
     const TILE_SIZE = 256;
     const canvas = document.getElementById("map-canvas");
     const ctx = canvas.getContext("2d");
     let currentLayer = "clouds_new";
-    let baseTiles = {};     // темна спутникова база
-    let layerTiles = {};    // тільки поточний шар
+    let baseTiles = {};
+    let layerTiles = {};
     let lastUpdate = 0;
     const UPDATE_INTERVAL = 15 * 60 * 1000;
 
-    // Темна спутникова база (Esri WorldImagery)
     const BASE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
-    // Міста для маркерів
+    // Параметри виду
+    let zoom = 2;
+    let offsetX = 0;
+    let offsetY = 0;
+    let isDragging = false;
+    let startX, startY;
+
     const cities = [
         {name: "KYIV", lat: 50.45, lon: 30.52},
         {name: "TOKYO", lat: 35.68, lon: 139.76},
@@ -150,18 +196,19 @@
     ];
 
     function resizeMap() {
-        canvas.width = canvas.offsetWidth * devicePixelRatio;
-        canvas.height = canvas.offsetHeight * devicePixelRatio;
+        const container = canvas.parentElement;
+        canvas.width = container.offsetWidth * devicePixelRatio;
+        canvas.height = container.offsetHeight * devicePixelRatio;
         ctx.scale(devicePixelRatio, devicePixelRatio);
         renderMap();
         renderCityMarkers();
     }
     window.addEventListener("resize", resizeMap);
 
-    async function fetchBaseTile(x, y) {
-        const key = `${x}_${y}`;
+    async function fetchBaseTile(z, x, y) {
+        const key = `${z}_${x}_${y}`;
         if (baseTiles[key]) return baseTiles[key];
-        const url = BASE_URL.replace('{z}', ZOOM).replace('{x}', x).replace('{y}', y);
+        const url = BASE_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y);
         const img = new Image();
         img.crossOrigin = "anonymous";
         return new Promise(resolve => {
@@ -171,15 +218,11 @@
         });
     }
 
-    async function fetchLayerTile(x, y) {
-        const key = `${currentLayer}_${x}_${y}`;
+    async function fetchLayerTile(z, x, y) {
+        const key = `${currentLayer}_${z}_${x}_${y}`;
         if (layerTiles[key]) return layerTiles[key];
-
-        let url = `https://tile.openweathermap.org/map/${currentLayer}/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
-        if (currentLayer === "relief") {
-            url = `https://tile.openweathermap.org/map/relief/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
-        }
-
+        let url = `https://tile.openweathermap.org/map/${currentLayer}/${z}/${x}/${y}.png?appid=${API_KEY}`;
+        if (currentLayer === "relief") url = `https://tile.openweathermap.org/map/relief/${z}/${x}/${y}.png?appid=${API_KEY}`;
         const img = new Image();
         img.crossOrigin = "anonymous";
         return new Promise(resolve => {
@@ -189,92 +232,137 @@
         });
     }
 
-    async function loadMap() {
+    async function loadTiles() {
         const statusEl = document.getElementById("status");
-        statusEl.textContent = "SCANNING PLANET...";
+        statusEl.textContent = "SCANNING...";
 
-        const tilesCount = 1 << ZOOM;
+        const tilesCount = 1 << zoom;
         const promises = [];
 
-        // Завантажуємо базу (один раз)
         for (let x = 0; x < tilesCount; x++) {
             for (let y = 0; y < tilesCount; y++) {
-                promises.push(fetchBaseTile(x, y));
-            }
-        }
-
-        // Очищаємо попередній шар і завантажуємо новий
-        layerTiles = {};
-        for (let x = 0; x < tilesCount; x++) {
-            for (let y = 0; y < tilesCount; y++) {
-                promises.push(fetchLayerTile(x, y));
+                promises.push(fetchBaseTile(zoom, x, y));
+                promises.push(fetchLayerTile(zoom, x, y));
             }
         }
 
         await Promise.all(promises);
         renderMap();
         renderCityMarkers();
-        statusEl.textContent = `RADAR: ${currentLayer.replace('_new','').toUpperCase()} ACTIVE`;
+        statusEl.textContent = `RADAR: ${currentLayer.replace('_new','').toUpperCase()} | ZOOM: ${zoom}`;
         lastUpdate = Date.now();
-    }
-
-    function latLonToPixel(lat, lon) {
-        const tilesCount = 1 << ZOOM;
-        const x = (lon + 180) / 360 * tilesCount * TILE_SIZE;
-        const y = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * tilesCount * TILE_SIZE;
-        return {
-            x: (x / (tilesCount * TILE_SIZE)) * canvas.width / devicePixelRatio,
-            y: (y / (tilesCount * TILE_SIZE)) * canvas.height / devicePixelRatio
-        };
-    }
-
-    async function fetchCityWeather(city) {
-        try {
-            const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${city.lat}&lon=${city.lon}&appid=${API_KEY}&units=metric`);
-            const data = await res.json();
-            return `${city.name}: ${Math.round(data.main.temp)}°C`;
-        } catch {
-            return `${city.name}: —`;
-        }
-    }
-
-    async function renderCityMarkers() {
-        const container = document.getElementById("city-markers");
-        container.innerHTML = "";
-        for (const city of cities) {
-            const text = await fetchCityWeather(city);
-            const div = document.createElement("div");
-            div.className = "city";
-            div.textContent = text;
-            container.appendChild(div);
-        }
     }
 
     function renderMap() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const tilesCount = 1 << ZOOM;
-        const tilePixelSize = canvas.width / tilesCount / devicePixelRatio;
+        const containerW = canvas.parentElement.offsetWidth;
+        const containerH = canvas.parentElement.offsetHeight;
+        const tilesCount = 1 << zoom;
+        const mapPixelSize = tilesCount * TILE_SIZE;
+        const scale = canvas.width / devicePixelRatio / mapPixelSize;
+
+        const drawX = offsetX + containerW / 2 - (mapPixelSize * scale) / 2;
+        const drawY = offsetY + containerH / 2 - (mapPixelSize * 
+        scale) / 2;
 
         for (let x = 0; x < tilesCount; x++) {
             for (let y = 0; y < tilesCount; y++) {
-                const bx = x * tilePixelSize;
-                const by = y * tilePixelSize;
+                const tileX = drawX + x * TILE_SIZE * scale;
+                const tileY = drawY + y * TILE_SIZE * scale;
+                const tileSize = TILE_SIZE * scale;
 
-                // Спутникова база завжди
-                const base = baseTiles[`${x}_${y}`];
-                if (base) ctx.drawImage(base, bx, by, tilePixelSize, tilePixelSize);
+                const base = baseTiles[`${zoom}_${x}_${y}`];
+                if (base) ctx.drawImage(base, tileX, tileY, tileSize, tileSize);
 
-                // ТІЛЬКИ один вибраний шар (без накладання)
-                const layer = layerTiles[`${currentLayer}_${x}_${y}`];
-                if (layer) ctx.drawImage(layer, bx, by, tilePixelSize, tilePixelSize);
+                const layer = layerTiles[`${currentLayer}_${zoom}_${x}_${y}`];
+                if (layer) ctx.drawImage(layer, tileX, tileY, tileSize, tileSize);
             }
         }
 
         // Сканлайн
         const time = Date.now() * 0.001;
-        ctx.fillStyle = `rgba(0,255,136,${0.05 + 0.03 * Math.sin(time * 3)})`;
-        ctx.fillRect(0, (canvas.height / devicePixelRatio) * ((time * 0.5) % 1), canvas.width / devicePixelRatio, 3);
+        ctx.fillStyle = `rgba(0,255,136,${0.04 + 0.02 * Math.sin(time * 3)})`;
+        ctx.fillRect(0, containerH * ((time * 0.4) % 1), containerW, 2);
     }
+
+    // Панорамування
+    canvas.addEventListener("pointerdown", e => {
+        isDragging = true;
+        startX = e.clientX - offsetX;
+        startY = e.clientY - offsetY;
+        canvas.style.cursor = "grabbing";
+    });
+    canvas.addEventListener("pointermove", e => {
+        if (!isDragging) return;
+        offsetX = e.clientX - startX;
+        offsetY = e.clientY - startY;
+        renderMap();
+    });
+    canvas.addEventListener("pointerup", () => {
+        isDragging = false;
+        canvas.style.cursor = "grab";
+    });
+    canvas.addEventListener("pointerleave", () => {
+        isDragging = false;
+        canvas.style.cursor = "grab";
+    });
+
+    // Зум
+    document.getElementById("zoom-in").addEventListener("click", () => {
+        if (zoom < 6) {
+            zoom++;
+            baseTiles = {}; layerTiles = {};
+            loadTiles();
+        }
+    });
+    document.getElementById("zoom-out").addEventListener("click", () => {
+        if (zoom > 1) {
+            zoom--;
+            baseTiles = {}; layerTiles = {};
+            loadTiles();
+        }
+    });
+
+    // Зум коліщатком
+    canvas.addEventListener("wheel", e => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -1 : 1;
+        const newZoom = zoom + delta;
+        if (newZoom >= 1 && newZoom <= 6) {
+            zoom = newZoom;
+            baseTiles = {}; layerTiles = {};
+            loadTiles();
+        }
+    });
+
+    // Зум pinch на мобілках
+    let lastDist = 0;
+    canvas.addEventListener("touchstart", e => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            lastDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+        }
+    });
+    canvas.addEventListener("touchmove", e => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const delta = dist > lastDist ? 1 : -1;
+            lastDist = dist;
+            const newZoom = zoom + delta;
+            if (newZoom >= 1 && newZoom <= 6) {
+                zoom = newZoom;
+                baseTiles = {}; layerTiles = {};
+                loadTiles();
+            }
+        }
+    });
 
     document.querySelectorAll('button[data-layer]').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -282,22 +370,22 @@
             document.querySelector('.active')?.classList.remove('active');
             btn.classList.add('active');
             currentLayer = btn.dataset.layer;
-            layerTiles = {}; // очищаємо тільки шар, база залишається
-            await loadMap();
+            layerTiles = {};
+            await loadTiles();
         });
     });
 
     async function autoUpdate() {
         if (Date.now() - lastUpdate > UPDATE_INTERVAL) {
             layerTiles = {};
-            await loadMap();
+            await loadTiles();
         }
         renderMap();
         requestAnimationFrame(autoUpdate);
     }
 
     resizeMap();
-    loadMap();
+    loadTiles();
     autoUpdate();
 </script>
 </body>
