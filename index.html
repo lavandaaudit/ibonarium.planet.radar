@@ -283,17 +283,17 @@
             const fullMapSize = tilesCount * TILE_SIZE;
 
             // Легке обрізання знизу (Антарктида трохи менше видно) — тільки 8%
-            const cropBottom = 0.08;
+            const cropBottom = 0.2;
             const visibleRows = Math.floor(tilesCount * (1 - cropBottom));
 
             // Загальний масштаб трохи зменшено (на ~5%)
-            const scale = (W * 0.96) / fullMapSize;  // було 0.96, тепер 0.91
+            const scale = (W * 0.99) / fullMapSize;  // було 0.96, тепер 0.91
 
             const mapWidth = fullMapSize * scale;
             const mapHeight = visibleRows * TILE_SIZE * scale;
 
             const offsetX = (W - mapWidth) / 2;
-            const offsetY = (H - mapHeight) / 2 - H * 0.05; // легкий зсув вгору
+            const offsetY = (H - mapHeight) / 2 - H * 0.15; // легкий зсув вгору
 
             for (let x = 0; x < tilesCount; x++) {
                 for (let y = 0; y < visibleRows; y++) {
@@ -363,4 +363,5 @@
     </script>
 </body>
 </html>
+
 
