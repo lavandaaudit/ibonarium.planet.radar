@@ -1,4 +1,4 @@
-<!DOCTYPE html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
@@ -308,10 +308,18 @@
                     if (base) ctx.drawImage(base, bx, by, tw, th);
 
                     const layer = layerTiles[`${currentLayer}_${x}_${y}`];
-                    if (layer) ctx.drawImage(layer, bx, by, tw, th);
+                    if (layer) {
+                        // ПІДВИЩЕНИЙ КОНТРАСТ: малюємо шар з повною непрозорістю
+                        if (currentLayer !== "relief") {  // рельєф і так щільний
+                            ctx.globalAlpha = 1.0;
+                        }
+                        ctx.drawImage(layer, bx, by, tw, th);
+                        ctx.globalAlpha = 1.0; // скидаємо на всяк випадок
+                    }
                 }
             }
 
+            // Сканлайн ефект
             const time = Date.now() * 0.001;
             ctx.fillStyle = `rgba(77,210,255,${0.05 + 0.03 * Math.sin(time * 3)})`;
             ctx.fillRect(0, H * ((time * 0.5) % 1), W, 3);
