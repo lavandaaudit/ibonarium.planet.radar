@@ -281,14 +281,29 @@
 
             const tilesCount = 1 << ZOOM;
             const fullMapSize = tilesCount * TILE_SIZE;
-            const scale = Math.min(W / fullMapSize, H / fullMapSize) * 0.85; // трохи менше, щоб не торкалось країв
-            const offsetX = (W - fullMapSize * scale) / 2;
-            const offsetY = (H - fullMapSize * scale) / 2 - (H * 0.08); // зсув вгору для кращого вигляду
+
+            // Прямокутна форма: ширше, обрізаємо зверху і знизу (полюси)
+            const cropTopBottom = 0.25; // обрізаємо по 25% зверху і знизу (всього 50%)
+            const visibleHeightRatio = 1 - 2 * cropTopBottom;
+
+            const scaleX = W / fullMapSize * 0.95;           // трохи відступи по боках
+            const scaleY = (H / fullMapSize) / visibleHeightRatio * 0.95;
+            const scale = Math.min(scaleX, scaleY);
+
+            const mapWidth = fullMapSize * scale;
+            const mapHeight = fullMapSize * visibleHeightRatio * scale;
+
+            const offsetX = (W - mapWidth) / 2;
+            const offsetY = (H - mapHeight) / 2;
+
+            // Обрізаємо рендер: малюємо тільки середню частину по Y
+            const startTileY = Math.floor(tilesCount * cropTopBottom);
+            const endTileY = Math.floor(tilesCount * (1 - cropTopBottom));
 
             for (let x = 0; x < tilesCount; x++) {
-                for (let y = 0; y < tilesCount; y++) {
+                for (let y = startTileY; y < endTileY; y++) {
                     const bx = offsetX + x * TILE_SIZE * scale;
-                    const by = offsetY + y * TILE_SIZE * scale;
+                    const by = offsetY + (y - startTileY) * TILE_SIZE * scale;
                     const tw = TILE_SIZE * scale;
                     const th = TILE_SIZE * scale;
 
@@ -329,7 +344,7 @@
                 document.querySelector('.active')?.classList.remove('active');
                 btn.classList.add('active');
                 currentLayer = btn.dataset.layer;
-                layerTiles = {}; // очищаємо кеш шару
+                layerTiles = {};
                 await loadMap();
             });
         });
