@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex,nofollow">
+    <title>ibonarium planet radar</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html,body {
+            height:100%; width:100%;
+            background:#000;
+            color:#00ff88;
+            font-family:"Courier New",monospace;
+            overflow:hidden;
+        }
+        canvas#stars { position:fixed; inset:0; z-index:0; }
+        .wrapper {
+            position:relative; z-index:2;
+            height:100%; padding:20px;
+            display:flex; flex-direction:column; gap:24px;
+            align-items:center; justify-content:center;
+        }
+        h1 {
+            font-size:16px; letter-spacing:3px; opacity:0.7;
+            text-shadow:0 0 8px rgba(0,255,136,0.4);
+        }
+        .map-container {
+            width:100%; max-width:900px; height:70vh;
+            background:rgba(0,20,40,0.8);
+            border:1px solid rgba(0,255,136,0.3);
+            box-shadow:0 0 30px rgba(0,255,136,0.2);
+            position:relative;
+        }
+        #map-canvas {
+            width:100%; height:100%; image-rendering:-webkit-optimize-contrast;
+            image-rendering:-moz-crisp-edges; image-rendering:pixelated;
+        }
+        .controls {
+            display:flex; gap:12px; flex-wrap:wrap; justify-content:center;
+        }
+        button {
+            background:rgba(0,40,60,0.8); 
+            border:1px solid rgba(0,255,136,0.4);
+            color:#00ff88; padding:8px 16px;
+            font-size:12px; letter-spacing:1.5px;
+            cursor:pointer; transition:.3s;
+            backdrop-filter:blur(10px);
+        }
+        button:hover {
+            background:rgba(0,255,136,0.1);
+            box-shadow:0 0 15px rgba(0,255,136,0.5);
+            border-color:rgba(0,255,136,0.8);
+        }
+        button.active {
+            background:rgba(0,255,136,0.2);
+            box-shadow:0 0 20px rgba(0,255,136,0.6);
+            color:#000;
+        }
+        .status {
+            font-size:12px; letter-spacing:2px; opacity:0.6;
+            text-shadow:0 0 4px rgba(0,255,136,0.3);
+        }
+    </style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="wrapper">
+    <h1>IBONARIUM PLANET RADAR</h1>
+    
+    <div class="map-container">
+        <canvas id="map-canvas"></canvas>
+    </div>
+    
+    <div class="controls">
+        <button data-layer="clouds_new" class="active">CLOUDS</button>
+        <button data-layer="temp_new">TEMP</button>
+        <button data-layer="precipitation_new">PRECIP</button>
+        <button data-layer="wind_new">WIND</button>
+    </div>
+    
+    <p class="status" id="status">SCANNING PLANETARY ATMOSPHERE...</p>
+</div>
+
+<script>
+    /* STARFIELD */
+    const starsC = document.getElementById("stars");
+    const starsCtx = starsC.getContext("2d");
+    let SW, SH, stars = [];
+    function resizeStars() {
+        SW = starsC.width = innerWidth;
+        SH = starsC.height = innerHeight;
+        stars = Array.from({length:120}, () => ({
+            x: Math.random() * SW,
+            y: Math.random() * SH,
+            z: Math.random() * SW,
+            speed: 0.05 + Math.random() * 0.1
+        }));
+    }
+    resizeStars();
+    window.addEventListener("resize", resizeStars);
+    function drawStars() {
+        starsCtx.fillStyle = "rgba(0,0,0,0.12)";
+        starsCtx.fillRect(0, 0, SW, SH);
+        starsCtx.fillStyle = "#00ff88";
+        stars.forEach(st => {
+            st.z -= st.speed;
+            if (st.z <= 0) st.z = SW;
+            const k = 120 / st.z;
+            const x = (st.x - SW / 2) * k + SW / 2;
+            const y = (st.y - SH / 2) * k + SH / 2;
+            if (x > 0 && x < SW && y > 0 && y < SH) {
+                const size = (1 - st.z / SW) * 1.5;
+                starsCtx.globalAlpha = 1 - st.z / SW;
+                starsCtx.fillRect(x, y, size, size);
+            }
+        });
+        starsCtx.globalAlpha = 1;
+        requestAnimationFrame(drawStars);
+    }
+    drawStars();
+
+    /* MAP RADAR */
+    const API_KEY = "b99fdb51e2dcc8e0549f8b99ef20cedd";
+    const ZOOM = 2;
+    const TILE_SIZE = 256;
+    const canvas = document.getElementById("map-canvas");
+    const ctx = canvas.getContext("2d");
+    let currentLayer = "clouds_new";
+    let tiles = {};
+    let lastUpdate = 0;
+    const UPDATE_INTERVAL = 15 * 60 * 1000; // 15 хвилин
+
+    function resizeMap() {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        if (Object.keys(tiles).length > 0) renderMap();
+    }
+    window.addEventListener("resize", resizeMap);
+
+    async function fetchTile(layer, x, y) {
+        const key = `${layer}_${x}_${y}`;
+        if (tiles[key]) return tiles[key];
+        
+        try {
+            const url = `https://tile.openweathermap.org/map/${layer}/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
+            const response = await fetch(url);
+            if (response.ok) {
+                const blob = await response.blob();
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                return new Promise((resolve) => {
+                    img.onload = () => {
+                        tiles[key] = img;
+                        resolve(img);
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = URL.createObjectURL(blob);
+                });
+            }
+        } catch (e) {
+            console.error("Tile fetch error:", e);
+        }
+        return null;
+    }
+
+    async function loadMap(layer) {
+        const statusEl = document.getElementById("status");
+        statusEl.textContent = "LOADING PLANETARY DATA...";
+        
+        const tilesCount = 1 << ZOOM; // 4 tiles
+        const promises = [];
+        
+        for (let x = 0; x < tilesCount; x++) {
+            for (let y = 0; y < tilesCount; y++) {
+                promises.push(fetchTile(layer, x, y));
+            }
+        }
+        
+        try {
+            await Promise.all(promises);
+            renderMap();
+            statusEl.textContent = `PLANET RADAR: ${layer.toUpperCase().replace('_new', '')} LAYER ACTIVE`;
+            lastUpdate = Date.now();
+        } catch (e) {
+            statusEl.textContent = "RADAR SCAN FAILED";
+        }
+    }
+
+    function renderMap() {
+        ctx.imageSmoothingEnabled = false;
+        const tilesCount = 1 << ZOOM;
+        const mapSize = TILE_SIZE * tilesCount;
+        
+        // Render tiles
+        for (let x = 0; x < tilesCount; x++) {
+            for (let y = 0; y < tilesCount; y++) {
+                const tile = tiles[`${currentLayer}_${x}_${y}`];
+                if (tile) {
+                    ctx.drawImage(tile, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
+        
+        // Cyberpunk overlay grid
+        ctx.strokeStyle = "rgba(0,255,136,0.1)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= canvas.width; i += 40) {
+            ctx.beginPath();
+            ctx.moveTo(i, 0);
+            ctx.lineTo(i, canvas.height);
+            ctx.stroke();
+        }
+        for (let i = 0; i <= canvas.height; i += 40) {
+            ctx.beginPath();
+            ctx.moveTo(0, i);
+            ctx.lineTo(canvas.width, i);
+            ctx.stroke();
+        }
+        
+        // Radar scanline effect
+        const time = Date.now() * 0.001;
+        ctx.fillStyle = `rgba(0,255,136,${0.03 + 0.02 * Math.sin(time)}`;
+        ctx.fillRect(0, 0, canvas.width, 2);
+    }
+
+    // Controls
+    document.querySelectorAll('button[data-layer]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const layer = btn.dataset.layer;
+            if (layer !== currentLayer) {
+                document.querySelector('.active').classList.remove('active');
+                btn.classList.add('active');
+                currentLayer = layer;
+                await loadMap(layer);
+            }
+        });
+    });
+
+    /* AUTO UPDATE */
+    async function autoUpdate() {
+        if (Date.now() - lastUpdate > UPDATE_INTERVAL) {
+            await loadMap(currentLayer);
+        }
+        requestAnimationFrame(autoUpdate);
+    }
+
+    /* INIT */
+    canvas.addEventListener('load', resizeMap);
+    resizeMap();
+    loadMap("clouds_new");
+    autoUpdate();
+</script>
+</body>
+</html>
