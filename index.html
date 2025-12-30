@@ -2,313 +2,358 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <meta name="robots" content="noindex,nofollow">
-    <title>ibonarium planet radar</title>
+    <title>IBONARIUM PLANET RADAR</title>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        html,body {
-            height:100%; width:100%;
-            background:#000;
-            color:#00ff88;
-            font-family:"Courier New",monospace;
-            overflow:hidden;
+        /* ================= RESET & BODY ================= */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            color: #9fe7ff;
+            font-family: "Courier New", monospace;
+            overflow: hidden;
         }
-        canvas#stars { position:fixed; inset:0; z-index:0; }
+        /* ================= STARS BACKGROUND ================= */
+        #starsCanvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+        }
+        /* ================= MAP CANVAS ================= */
+        #mapCanvas {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+        }
+        /* ================= WRAPPER (внизу) ================= */
         .wrapper {
-            position:relative; z-index:2;
-            height:100%; padding:20px;
-            display:flex; flex-direction:column; gap:24px;
-            align-items:center; justify-content:center;
+            position: fixed;
+            bottom: 15px;
+            left: 0;
+            right: 0;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 8px;
+            pointer-events: none;
         }
-        h1 {
-            font-size:16px; letter-spacing:3px; opacity:0.7;
-            text-shadow:0 0 8px rgba(0,255,136,0.4);
+        /* ================= CITY MARKERS ================= */
+        .city-markers {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            pointer-events: auto;
+            text-align: center;
         }
-        .map-container {
-            width:100%; max-width:900px; height:70vh;
-            background:#000;
-            border:1px solid rgba(0,255,136,0.3);
-            box-shadow:0 0 30px rgba(0,255,136,0.2);
-            position:relative; overflow:hidden;
-            display:flex; align-items:center; justify-content:center;
+        .city-markers .title {
+            font-size: 12px;
+            letter-spacing: 1.5px;
+            opacity: 0.8;
         }
-        #map-canvas { max-width:100%; max-height:100%; image-rendering:pixelated; }
+        .city-markers .data-line {
+            font-size: 11px;
+            letter-spacing: 1.2px;
+            opacity: 0.9;
+        }
+        /* ================= CONTROLS ================= */
         .controls {
-            display:flex; gap:12px; flex-wrap:wrap; justify-content:center;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
         }
         button {
-            background:rgba(0,40,60,0.8); 
-            border:1px solid rgba(0,255,136,0.4);
-            color:#00ff88; padding:8px 16px;
-            font-size:12px; letter-spacing:1.5px;
-            cursor:pointer; transition:.3s;
+            background: transparent;
+            border: 1px solid #4dd2ff;
+            color: #4dd2ff;
+            font-family: "Courier New", monospace;
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.3s;
+            pointer-events: auto;
         }
         button:hover {
-            background:rgba(0,255,136,0.1);
-            box-shadow:0 0 15px rgba(0,255,136,0.5);
+            background: rgba(77,210,255,0.15);
+            box-shadow: 0 0 10px rgba(77,210,255,0.6);
         }
         button.active {
-            background:rgba(0,255,136,0.2);
-            box-shadow:0 0 20px rgba(0,255,136,0.6);
-            color:#000;
+            background: #4dd2ff;
+            color: #000;
+            box-shadow: 0 0 18px #4dd2ff;
         }
-        .status {
-            font-size:12px; letter-spacing:2px; opacity:0.6;
+        /* ================= TEXT ================= */
+        .text-block {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            text-align: center;
+            pointer-events: auto;
         }
-        .city-markers {
-            position:absolute; top:10px; left:10px; z-index:10;
-            display:flex; flex-direction:column; gap:8px;
+        .main-text {
+            font-size: 14px;
+            letter-spacing: 1px;
         }
-        .city {
-            background:rgba(0,0,0,0.6); padding:4px 8px;
-            border:1px solid rgba(0,255,136,0.4);
-            font-size:11px; letter-spacing:1px;
-            box-shadow:0 0 10px rgba(0,255,136,0.3);
+        .sub-text {
+            font-size: 12px;
+            letter-spacing: 1px;
+            opacity: 0.8;
         }
-        /* Responsive для всіх девайсів */
-        @media (max-width: 768px) {
-            .wrapper { padding:10px; gap:16px; }
-            h1 { font-size:14px; }
-            .map-container { height:60vh; }
-            .controls { gap:8px; }
-            button { padding:6px 12px; font-size:11px; }
-            .status { font-size:11px; }
-            .city-markers { top:5px; left:5px; font-size:10px; }
+        .footer-text {
+            font-size: 10px;
+            letter-spacing: 1px;
+            opacity: 0.6;
         }
-        @media (max-height: 500px) {
-            .map-container { height:80vh; }
+        .footer-text a {
+            color: #4dd2ff;
+            text-decoration: underline;
+        }
+        /* ================= MOBILE ================= */
+        @media (max-width: 600px) {
+            button {
+                font-size: 10px;
+                padding: 4px 8px;
+            }
+            .main-text { font-size: 13px; }
+            .sub-text { font-size: 11px; }
+            .footer-text { font-size: 9px; }
+            .wrapper { bottom: 8px; gap: 8px; }
+            .city-markers .title, .city-markers .data-line {
+                font-size: 10px;
+            }
         }
     </style>
 </head>
 <body>
-<canvas id="stars"></canvas>
-<div class="wrapper">
-    <h1>IBONARIUM PLANET RADAR</h1>
-    
-    <div class="map-container">
-        <canvas id="map-canvas"></canvas>
-        <div class="city-markers" id="city-markers"></div>
+    <canvas id="starsCanvas"></canvas>
+    <canvas id="mapCanvas"></canvas>
+
+    <div class="wrapper">
+        <!-- Блок міст -->
+        <div class="city-markers">
+            <div class="title">РАДАР МІСТ</div>
+            <div class="data-line" id="city-data">ЗАВАНТАЖЕННЯ...</div>
+        </div>
+
+        <!-- Кнопки перемикання шарів -->
+        <div class="controls">
+            <button class="layerBtn active" data-layer="clouds_new">ХМАРИ</button>
+            <button class="layerBtn" data-layer="temp_new">ТЕМПЕРАТУРА</button>
+            <button class="layerBtn" data-layer="precipitation_new">ОПАДИ</button>
+            <button class="layerBtn" data-layer="wind_new">ВІТЕР</button>
+            <button class="layerBtn" data-layer="pressure_new">ТИСК</button>
+            <button class="layerBtn" data-layer="relief">РЕЛЬЄФ</button>
+        </div>
+
+        <!-- Текстова інформація -->
+        <div class="text-block">
+            <div class="main-text" id="status">СКАНУВАННЯ...</div>
+            <div class="sub-text">
+                Ibonarium Cosmo Dynamics Lab LIVE — Center for Space & Planetary Monitoring
+            </div>
+            <div class="footer-text">
+                <a href="https://t.me/ibonariumcosmodynamicslablive" target="_blank">
+                    https://t.me/ibonariumcosmodynamicslablive
+                </a>
+                <br>
+                2026 ibonarium project by Roman Katyuschenko
+            </div>
+        </div>
     </div>
-    
-    <div class="controls">
-        <button data-layer="clouds_new" class="active">CLOUDS</button>
-        <button data-layer="temp_new">TEMP</button>
-        <button data-layer="precipitation_new">PRECIP</button>
-        <button data-layer="wind_new">WIND</button>
-        <button data-layer="pressure_new">PRESSURE</button>
-        <button data-layer="relief">RELIEF</button>
-    </div>
-    
-    <p class="status" id="status">SCANNING...</p>
-</div>
 
-<script>
-    /* STARFIELD */
-    const starsC = document.getElementById("stars");
-    const starsCtx = starsC.getContext("2d");
-    let SW, SH, stars = [];
-    function resizeStars() {
-        SW = starsC.width = innerWidth;
-        SH = starsC.height = innerHeight;
-        stars = Array.from({length:120}, () => ({
-            x: Math.random() * SW, y: Math.random() * SH, z: Math.random() * SW
-        }));
-    }
-    resizeStars();
-    window.addEventListener("resize", resizeStars);
-    function drawStars() {
-        starsCtx.fillStyle = "rgba(0,0,0,0.1)";
-        starsCtx.fillRect(0, 0, SW, SH);
-        starsCtx.fillStyle = "#00ff88";
-        stars.forEach(st => {
-            st.z -= 0.08;
-            if (st.z <= 0) st.z = SW;
-            const k = 120 / st.z;
-            const x = (st.x - SW / 2) * k + SW / 2;
-            const y = (st.y - SH / 2) * k + SH / 2;
-            if (x > 0 && x < SW && y > 0 && y < SH) {
-                const size = (1 - st.z / SW) * 1.5;
-                starsCtx.globalAlpha = 1 - st.z / SW;
-                starsCtx.fillRect(x, y, size, size);
+    <script>
+        /* ================= STARS BACKGROUND ================= */
+        const starsCanvas = document.getElementById("starsCanvas");
+        const sctx = starsCanvas.getContext("2d");
+        let W = starsCanvas.width = window.innerWidth;
+        let H = starsCanvas.height = window.innerHeight;
+        const stars = [];
+        const numStars = 300;
+        for (let i = 0; i < numStars; i++) {
+            stars.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                size: Math.random() * 1.5 + 0.5,
+                speed: Math.random() * 0.5 + 0.1,
+                opacity: Math.random() * 0.8 + 0.2
+            });
+        }
+        function drawStars() {
+            sctx.clearRect(0, 0, W, H);
+            sctx.fillStyle = "#fff";
+            stars.forEach(star => {
+                sctx.globalAlpha = star.opacity;
+                sctx.fillRect(star.x, star.y, star.size, star.size);
+                star.y += star.speed;
+                if (star.y > H) star.y = 0;
+            });
+            sctx.globalAlpha = 1;
+            requestAnimationFrame(drawStars);
+        }
+        drawStars();
+
+        /* ================= MAP RADAR ================= */
+        const API_KEY = "b99fdb51e2dcc8e0549f8b99ef20cedd";
+        const ZOOM = 2;
+        const TILE_SIZE = 256;
+        const mapCanvas = document.getElementById("mapCanvas");
+        const ctx = mapCanvas.getContext("2d");
+        mapCanvas.width = W;
+        mapCanvas.height = H;
+
+        let currentLayer = "clouds_new";
+        let baseTiles = {};
+        let layerTiles = {};
+        let lastUpdate = 0;
+        const UPDATE_INTERVAL = 15 * 60 * 1000; // 15 хвилин
+
+        const BASE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+
+        const cities = [
+            {name: "KYIV", lat: 50.45, lon: 30.52},
+            {name: "TOKYO", lat: 35.68, lon: 139.76},
+            {name: "NIGHT CITY", lat: 37.77, lon: -122.42},
+            {name: "MOSCOW", lat: 55.75, lon: 37.62},
+            {name: "BERLIN", lat: 52.52, lon: 13.40}
+        ];
+
+        async function fetchBaseTile(x, y) {
+            const key = `${x}_${y}`;
+            if (baseTiles[key]) return baseTiles[key];
+            const url = BASE_URL.replace('{z}', ZOOM).replace('{x}', x).replace('{y}', y);
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            return new Promise(resolve => {
+                img.onload = () => { baseTiles[key] = img; resolve(img); };
+                img.onerror = () => resolve(null);
+                img.src = url;
+            });
+        }
+
+        async function fetchLayerTile(x, y) {
+            const key = `${currentLayer}_${x}_${y}`;
+            if (layerTiles[key]) return layerTiles[key];
+            let url = `https://tile.openweathermap.org/map/${currentLayer}/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
+            if (currentLayer === "relief") url = `https://tile.openweathermap.org/map/relief/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            return new Promise(resolve => {
+                img.onload = () => { layerTiles[key] = img; resolve(img); };
+                img.onerror = () => resolve(null);
+                img.src = url;
+            });
+        }
+
+        async function loadMap() {
+            const statusEl = document.getElementById("status");
+            statusEl.textContent = "СКАНУВАННЯ ПЛАНЕТИ...";
+
+            const tilesCount = 1 << ZOOM;
+            const promises = [];
+            for (let x = 0; x < tilesCount; x++) {
+                for (let y = 0; y < tilesCount; y++) {
+                    promises.push(fetchBaseTile(x, y));
+                    promises.push(fetchLayerTile(x, y));
+                }
             }
-        });
-        starsCtx.globalAlpha = 1;
-        requestAnimationFrame(drawStars);
-    }
-    drawStars();
+            await Promise.all(promises);
 
-    /* MAP RADAR */
-    const API_KEY = "b99fdb51e2dcc8e0549f8b99ef20cedd";
-    const ZOOM = 2;
-    const TILE_SIZE = 256;
-    const canvas = document.getElementById("map-canvas");
-    const ctx = canvas.getContext("2d");
-    let currentLayer = "clouds_new";
-    let baseTiles = {};
-    let layerTiles = {};
-    let lastUpdate = 0;
-    const UPDATE_INTERVAL = 15 * 60 * 1000;
+            renderMap();
+            await renderCityMarkers();
 
-    // Спутникова база
-    const BASE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+            const layerName = currentLayer.replace('_new', '').toUpperCase();
+            statusEl.textContent = `РАДАР: ${layerName === 'RELIEF' ? 'РЕЛЬЄФ' : layerName} АКТИВНИЙ`;
+            lastUpdate = Date.now();
+        }
 
-    // Міста
-    const cities = [
-        {name: "KYIV", lat: 50.45, lon: 30.52},
-        {name: "TOKYO", lat: 35.68, lon: 139.76},
-        {name: "NIGHT CITY", lat: 37.77, lon: -122.42},
-        {name: "MOSCOW", lat: 55.75, lon: 37.62},
-        {name: "BERLIN", lat: 52.52, lon: 13.40}
-    ];
+        function renderMap() {
+            ctx.clearRect(0, 0, W, H);
 
-    function resizeMap() {
-        canvas.width = canvas.parentElement.offsetWidth * devicePixelRatio;
-        canvas.height = canvas.parentElement.offsetHeight * devicePixelRatio;
-        ctx.scale(devicePixelRatio, devicePixelRatio);
-        canvas.style.width = 'auto';
-        canvas.style.height = 'auto';
-        canvas.style.maxWidth = '100%';
-        canvas.style.maxHeight = '100%';
-        renderMap();
-        renderCityMarkers();
-    }
-    window.addEventListener("resize", resizeMap);
+            const tilesCount = 1 << ZOOM;
+            const fullMapSize = tilesCount * TILE_SIZE;
+            const scale = Math.min(W / fullMapSize, H / fullMapSize) * 0.85; // трохи менше, щоб не торкалось країв
+            const offsetX = (W - fullMapSize * scale) / 2;
+            const offsetY = (H - fullMapSize * scale) / 2 - (H * 0.08); // зсув вгору для кращого вигляду
 
-    async function fetchBaseTile(x, y) {
-        const key = `${x}_${y}`;
-        if (baseTiles[key]) return baseTiles[key];
-        const url = BASE_URL.replace('{z}', ZOOM).replace('{x}', x).replace('{y}', y);
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        return new Promise(resolve => {
-            img.onload = () => { baseTiles[key] = img; resolve(img); };
-            img.onerror = () => resolve(null);
-            img.src = url;
-        });
-    }
+            for (let x = 0; x < tilesCount; x++) {
+                for (let y = 0; y < tilesCount; y++) {
+                    const bx = offsetX + x * TILE_SIZE * scale;
+                    const by = offsetY + y * TILE_SIZE * scale;
+                    const tw = TILE_SIZE * scale;
+                    const th = TILE_SIZE * scale;
 
-    async function fetchLayerTile(x, y) {
-        const key = `${currentLayer}_${x}_${y}`;
-        if (layerTiles[key]) return layerTiles[key];
-        let url = `https://tile.openweathermap.org/map/${currentLayer}/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
-        if (currentLayer === "relief") url = `https://tile.openweathermap.org/map/relief/${ZOOM}/${x}/${y}.png?appid=${API_KEY}`;
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        return new Promise(resolve => {
-            img.onload = () => { layerTiles[key] = img; resolve(img); };
-            img.onerror = () => resolve(null);
-            img.src = url;
-        });
-    }
+                    const base = baseTiles[`${x}_${y}`];
+                    if (base) ctx.drawImage(base, bx, by, tw, th);
 
-    async function loadMap() {
-        const statusEl = document.getElementById("status");
-        statusEl.textContent = "SCANNING PLANET...";
-
-        const tilesCount = 1 << ZOOM;
-        const promises = [];
-        for (let x = 0; x < tilesCount; x++) {
-            for (let y = 0; y < tilesCount; y++) {
-                promises.push(fetchBaseTile(x, y));
-                promises.push(fetchLayerTile(x, y));
+                    const layer = layerTiles[`${currentLayer}_${x}_${y}`];
+                    if (layer) ctx.drawImage(layer, bx, by, tw, th);
+                }
             }
+
+            // Сканлайн ефект
+            const time = Date.now() * 0.001;
+            ctx.fillStyle = `rgba(77,210,255,${0.05 + 0.03 * Math.sin(time * 3)})`;
+            ctx.fillRect(0, H * ((time * 0.5) % 1), W, 3);
         }
 
-        await Promise.all(promises);
-        renderMap();
-        renderCityMarkers();
-        statusEl.textContent = `RADAR: ${currentLayer.replace('_new','').toUpperCase()} ACTIVE`;
-        lastUpdate = Date.now();
-    }
-
-    function latLonToPixel(lat, lon) {
-        const tilesCount = 1 << ZOOM;
-        const x = (lon + 180) / 360 * tilesCount * TILE_SIZE;
-        const y = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * tilesCount * TILE_SIZE;
-        return {
-            x: (x / (tilesCount * TILE_SIZE)) * canvas.parentElement.offsetWidth,
-            y: (y / (tilesCount * TILE_SIZE)) * canvas.parentElement.offsetHeight
-        };
-    }
-
-    async function fetchCityWeather(city) {
-        try {
-            const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${city.lat}&lon=${city.lon}&appid=${API_KEY}&units=metric`);
-            const data = await res.json();
-            return `${city.name}: ${Math.round(data.main.temp)}°C`;
-        } catch {
-            return `${city.name}: —`;
-        }
-    }
-
-    async function renderCityMarkers() {
-        const container = document.getElementById("city-markers");
-        container.innerHTML = "";
-        for (const city of cities) {
-            const text = await fetchCityWeather(city);
-            const div = document.createElement("div");
-            div.className = "city";
-            div.textContent = text;
-            container.appendChild(div);
-        }
-    }
-
-    function renderMap() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const tilesCount = 1 << ZOOM;
-        const fullMapSize = tilesCount * TILE_SIZE;
-        const canvasWidth = canvas.parentElement.offsetWidth;
-        const canvasHeight = canvas.parentElement.offsetHeight;
-        const scale = Math.min(canvasWidth / fullMapSize, canvasHeight / fullMapSize);
-        const offsetX = (canvasWidth - fullMapSize * scale) / 2;
-        const offsetY = (canvasHeight - fullMapSize * scale) / 2;
-
-        for (let x = 0; x < tilesCount; x++) {
-            for (let y = 0; y < tilesCount; y++) {
-                const bx = offsetX + x * TILE_SIZE * scale;
-                const by = offsetY + y * TILE_SIZE * scale;
-                const tw = TILE_SIZE * scale;
-                const th = TILE_SIZE * scale;
-
-                const base = baseTiles[`${x}_${y}`];
-                if (base) ctx.drawImage(base, bx, by, tw, th);
-
-                const layer = layerTiles[`${currentLayer}_${x}_${y}`];
-                if (layer) ctx.drawImage(layer, bx, by, tw, th);
+        async function fetchCityWeather(city) {
+            try {
+                const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${city.lat}&lon=${city.lon}&appid=${API_KEY}&units=metric`);
+                const data = await res.json();
+                return `${city.name}: ${Math.round(data.main.temp)}°C`;
+            } catch {
+                return `${city.name}: —`;
             }
         }
 
-        // Сканлайн
-        const time = Date.now() * 0.001;
-        ctx.fillStyle = `rgba(0,255,136,${0.05 + 0.03 * Math.sin(time * 3)})`;
-        ctx.fillRect(0, (canvasHeight) * ((time * 0.5) % 1), canvasWidth, 3);
-    }
-
-    document.querySelectorAll('button[data-layer]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            if (btn.dataset.layer === currentLayer) return;
-            document.querySelector('.active')?.classList.remove('active');
-            btn.classList.add('active');
-            currentLayer = btn.dataset.layer;
-            layerTiles = {};
-            await loadMap();
-        });
-    });
-
-    async function autoUpdate() {
-        if (Date.now() - lastUpdate > UPDATE_INTERVAL) {
-            layerTiles = {};
-            await loadMap();
+        async function renderCityMarkers() {
+            const container = document.getElementById("city-data");
+            const cityTexts = await Promise.all(cities.map(fetchCityWeather));
+            container.textContent = cityTexts.join('  │  ');
         }
-        renderMap();
-        requestAnimationFrame(autoUpdate);
-    }
 
-    resizeMap();
-    loadMap();
-    autoUpdate();
-</script>
+        // Перемикання шарів
+        document.querySelectorAll('.layerBtn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (btn.dataset.layer === currentLayer) return;
+                document.querySelector('.active')?.classList.remove('active');
+                btn.classList.add('active');
+                currentLayer = btn.dataset.layer;
+                layerTiles = {}; // очищаємо кеш шару
+                await loadMap();
+            });
+        });
+
+        // Автооновлення та анімація
+        async function autoUpdate() {
+            if (Date.now() - lastUpdate > UPDATE_INTERVAL) {
+                layerTiles = {};
+                await loadMap();
+            }
+            renderMap();
+            requestAnimationFrame(autoUpdate);
+        }
+
+        // Ресайз
+        window.addEventListener("resize", () => {
+            W = starsCanvas.width = mapCanvas.width = window.innerWidth;
+            H = starsCanvas.height = mapCanvas.height = window.innerHeight;
+            renderMap();
+        });
+
+        // Старт
+        loadMap();
+        autoUpdate();
+    </script>
 </body>
 </html>
