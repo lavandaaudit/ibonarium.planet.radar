@@ -282,18 +282,18 @@
             const tilesCount = 1 << ZOOM;
             const fullMapSize = tilesCount * TILE_SIZE;
 
-            // Обрізаємо Антарктиду знизу на ~15%
-            const cropBottom = 0.15;
+            // Легке обрізання знизу (Антарктида трохи менше видно) — тільки 8%
+            const cropBottom = 0.08;
             const visibleRows = Math.floor(tilesCount * (1 - cropBottom));
 
-            // Масштабуємо по ширині екрану з невеликими відступами
-            const scale = (W * 0.96) / fullMapSize;
+            // Загальний масштаб трохи зменшено (на ~5%)
+            const scale = (W * 0.91) / fullMapSize;  // було 0.96, тепер 0.91
 
             const mapWidth = fullMapSize * scale;
             const mapHeight = visibleRows * TILE_SIZE * scale;
 
             const offsetX = (W - mapWidth) / 2;
-            const offsetY = (H - mapHeight) / 2 - H * 0.05; // трошки вгору для балансу
+            const offsetY = (H - mapHeight) / 2 - H * 0.03; // легкий зсув вгору
 
             for (let x = 0; x < tilesCount; x++) {
                 for (let y = 0; y < visibleRows; y++) {
