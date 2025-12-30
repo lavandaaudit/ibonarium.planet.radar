@@ -14,80 +14,71 @@
             color:#00ff88;
             font-family:"Courier New",monospace;
             overflow:hidden;
-            touch-action:pan-x pan-y;
         }
         canvas#stars { position:fixed; inset:0; z-index:0; }
         .wrapper {
             position:relative; z-index:2;
-            height:100%; padding:12px;
-            display:flex; flex-direction:column; gap:16px;
-            align-items:center;
+            height:100%; padding:20px;
+            display:flex; flex-direction:column; gap:24px;
+            align-items:center; justify-content:center;
         }
         h1 {
-            font-size:14px; letter-spacing:2.5px; opacity:0.75;
-            text-shadow:0 0 6px rgba(0,255,136,0.4);
+            font-size:16px; letter-spacing:3px; opacity:0.7;
+            text-shadow:0 0 8px rgba(0,255,136,0.4);
         }
         .map-container {
-            width:100%; height:55vh;
+            width:100%; max-width:900px; height:70vh;
             background:#000;
             border:1px solid rgba(0,255,136,0.3);
-            box-shadow:0 0 20px rgba(0,255,136,0.2);
+            box-shadow:0 0 30px rgba(0,255,136,0.2);
             position:relative; overflow:hidden;
+            display:flex; align-items:center; justify-content:center;
         }
-        #map-canvas {
-            width:100%; height:100%;
-            object-fit:contain; /* вся карта ціла, без обрізки */
-            image-rendering:pixelated;
-        }
+        #map-canvas { max-width:100%; max-height:100%; image-rendering:pixelated; }
         .controls {
-            display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+            display:flex; gap:12px; flex-wrap:wrap; justify-content:center;
         }
         button {
             background:rgba(0,40,60,0.8); 
             border:1px solid rgba(0,255,136,0.4);
-            color:#00ff88; padding:6px 12px;
-            font-size:11px; letter-spacing:1.2px;
+            color:#00ff88; padding:8px 16px;
+            font-size:12px; letter-spacing:1.5px;
             cursor:pointer; transition:.3s;
-            min-width:70px;
         }
-        button:hover, button:active {
-            background:rgba(0,255,136,0.15);
-            box-shadow:0 0 12px rgba(0,255,136,0.5);
+        button:hover {
+            background:rgba(0,255,136,0.1);
+            box-shadow:0 0 15px rgba(0,255,136,0.5);
         }
         button.active {
-            background:rgba(0,255,136,0.25);
-            box-shadow:0 0 15px rgba(0,255,136,0.6);
+            background:rgba(0,255,136,0.2);
+            box-shadow:0 0 20px rgba(0,255,136,0.6);
             color:#000;
         }
         .status {
-            font-size:11px; letter-spacing:1.8px; opacity:0.6;
+            font-size:12px; letter-spacing:2px; opacity:0.6;
         }
         .city-markers {
-            position:absolute; top:6px; left:6px; z-index:10;
-            display:flex; flex-direction:column; gap:6px;
+            position:absolute; top:10px; left:10px; z-index:10;
+            display:flex; flex-direction:column; gap:8px;
         }
         .city {
-            background:rgba(0,0,0,0.7); padding:3px 6px;
+            background:rgba(0,0,0,0.6); padding:4px 8px;
             border:1px solid rgba(0,255,136,0.4);
-            font-size:10px; letter-spacing:1px;
-            box-shadow:0 0 8px rgba(0,255,136,0.3);
-            white-space:nowrap;
+            font-size:11px; letter-spacing:1px;
+            box-shadow:0 0 10px rgba(0,255,136,0.3);
         }
-        /* Оптимізація для девайсів */
-        @media (max-width: 480px) {
-            .wrapper { padding:8px; gap:12px; }
-            h1 { font-size:13px; }
-            .map-container { height:50vh; }
-            .controls { gap:6px; }
-            button { padding:5px 10px; font-size:10px; min-width:60px; }
-            .status { font-size:10px; }
-            .city { font-size:9px; padding:2px 5px; }
+        /* Responsive для всіх девайсів */
+        @media (max-width: 768px) {
+            .wrapper { padding:10px; gap:16px; }
+            h1 { font-size:14px; }
+            .map-container { height:60vh; }
+            .controls { gap:8px; }
+            button { padding:6px 12px; font-size:11px; }
+            .status { font-size:11px; }
+            .city-markers { top:5px; left:5px; font-size:10px; }
         }
-        @media (max-height: 600px) {
-            .map-container { height:45vh; }
-        }
-        @media (orientation: landscape) {
-            .map-container { height:65vh; }
+        @media (max-height: 500px) {
+            .map-container { height:80vh; }
         }
     </style>
 </head>
@@ -114,32 +105,31 @@
 </div>
 
 <script>
-    /* STARFIELD — оптимізований */
+    /* STARFIELD */
     const starsC = document.getElementById("stars");
     const starsCtx = starsC.getContext("2d");
     let SW, SH, stars = [];
     function resizeStars() {
         SW = starsC.width = innerWidth;
         SH = starsC.height = innerHeight;
-        const count = SW < 768 ? 60 : 120;
-        stars = Array.from({length: count}, () => ({
+        stars = Array.from({length:120}, () => ({
             x: Math.random() * SW, y: Math.random() * SH, z: Math.random() * SW
         }));
     }
     resizeStars();
     window.addEventListener("resize", resizeStars);
     function drawStars() {
-        starsCtx.fillStyle = "rgba(0,0,0,0.08)";
+        starsCtx.fillStyle = "rgba(0,0,0,0.1)";
         starsCtx.fillRect(0, 0, SW, SH);
         starsCtx.fillStyle = "#00ff88";
         stars.forEach(st => {
-            st.z -= 0.06;
+            st.z -= 0.08;
             if (st.z <= 0) st.z = SW;
-            const k = 100 / st.z;
+            const k = 120 / st.z;
             const x = (st.x - SW / 2) * k + SW / 2;
             const y = (st.y - SH / 2) * k + SH / 2;
             if (x > 0 && x < SW && y > 0 && y < SH) {
-                const size = (1 - st.z / SW) * 1.2;
+                const size = (1 - st.z / SW) * 1.5;
                 starsCtx.globalAlpha = 1 - st.z / SW;
                 starsCtx.fillRect(x, y, size, size);
             }
@@ -149,7 +139,7 @@
     }
     drawStars();
 
-    /* MAP RADAR — швидкий, без масштабування, вся карта ціла */
+    /* MAP RADAR */
     const API_KEY = "b99fdb51e2dcc8e0549f8b99ef20cedd";
     const ZOOM = 2;
     const TILE_SIZE = 256;
@@ -161,8 +151,10 @@
     let lastUpdate = 0;
     const UPDATE_INTERVAL = 15 * 60 * 1000;
 
+    // Спутникова база
     const BASE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
+    // Міста
     const cities = [
         {name: "KYIV", lat: 50.45, lon: 30.52},
         {name: "TOKYO", lat: 35.68, lon: 139.76},
@@ -172,10 +164,13 @@
     ];
 
     function resizeMap() {
-        const container = canvas.parentElement;
-        canvas.width = container.offsetWidth * devicePixelRatio;
-        canvas.height = container.offsetHeight * devicePixelRatio;
+        canvas.width = canvas.parentElement.offsetWidth * devicePixelRatio;
+        canvas.height = canvas.parentElement.offsetHeight * devicePixelRatio;
         ctx.scale(devicePixelRatio, devicePixelRatio);
+        canvas.style.width = 'auto';
+        canvas.style.height = 'auto';
+        canvas.style.maxWidth = '100%';
+        canvas.style.maxHeight = '100%';
         renderMap();
         renderCityMarkers();
     }
@@ -210,7 +205,8 @@
 
     async function loadMap() {
         const statusEl = document.getElementById("status");
-        statusEl.textContent = "SCANNING...";
+        statusEl.textContent = "SCANNING PLANET...";
+
         const tilesCount = 1 << ZOOM;
         const promises = [];
         for (let x = 0; x < tilesCount; x++) {
@@ -219,10 +215,11 @@
                 promises.push(fetchLayerTile(x, y));
             }
         }
-        await Promise.allSettled(promises); // швидше, бо не чекає помилок
+
+        await Promise.all(promises);
         renderMap();
         renderCityMarkers();
-        statusEl.textContent = `RADAR: ${currentLayer.replace('_new','').toUpperCase()}`;
+        statusEl.textContent = `RADAR: ${currentLayer.replace('_new','').toUpperCase()} ACTIVE`;
         lastUpdate = Date.now();
     }
 
@@ -230,10 +227,9 @@
         const tilesCount = 1 << ZOOM;
         const x = (lon + 180) / 360 * tilesCount * TILE_SIZE;
         const y = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * tilesCount * TILE_SIZE;
-        const container = canvas.parentElement;
         return {
-            x: (x / (tilesCount * TILE_SIZE)) * container.offsetWidth,
-            y: (y / (tilesCount * TILE_SIZE)) * container.offsetHeight
+            x: (x / (tilesCount * TILE_SIZE)) * canvas.parentElement.offsetWidth,
+            y: (y / (tilesCount * TILE_SIZE)) * canvas.parentElement.offsetHeight
         };
     }
 
@@ -262,30 +258,32 @@
     function renderMap() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const tilesCount = 1 << ZOOM;
-        const containerW = canvas.parentElement.offsetWidth;
-        const containerH = canvas.parentElement.offsetHeight;
-        const tileSizeW = containerW / tilesCount;
-        const tileSizeH = containerH / tilesCount;
+        const fullMapSize = tilesCount * TILE_SIZE;
+        const canvasWidth = canvas.parentElement.offsetWidth;
+        const canvasHeight = canvas.parentElement.offsetHeight;
+        const scale = Math.min(canvasWidth / fullMapSize, canvasHeight / fullMapSize);
+        const offsetX = (canvasWidth - fullMapSize * scale) / 2;
+        const offsetY = (canvasHeight - fullMapSize * scale) / 2;
 
         for (let x = 0; x < tilesCount; x++) {
             for (let y = 0; y < tilesCount; y++) {
-                const bx = x * tileSizeW;
-                const by = y * tileSizeH;
+                const bx = offsetX + x * TILE_SIZE * scale;
+                const by = offsetY + y * TILE_SIZE * scale;
+                const tw = TILE_SIZE * scale;
+                const th = TILE_SIZE * scale;
 
                 const base = baseTiles[`${x}_${y}`];
-                if (base) ctx.drawImage(base, bx, by, tileSizeW, tileSizeH);
+                if (base) ctx.drawImage(base, bx, by, tw, th);
 
                 const layer = layerTiles[`${currentLayer}_${x}_${y}`];
-                if (layer) ctx.drawImage(layer, bx, by, tileSizeW, tileSizeH);
+                if (layer) ctx.drawImage(layer, bx, by, tw, th);
             }
         }
 
-        // Легкий сканлайн (тільки на десктопах)
-        if (innerWidth > 768) {
-            const time = Date.now() * 0.001;
-            ctx.fillStyle = `rgba(0,255,136,${0.04 + 0.02 * Math.sin(time * 3)})`;
-            ctx.fillRect(0, containerH * ((time * 0.4) % 1), containerW, 2);
-        }
+        // Сканлайн
+        const time = Date.now() * 0.001;
+        ctx.fillStyle = `rgba(0,255,136,${0.05 + 0.03 * Math.sin(time * 3)})`;
+        ctx.fillRect(0, (canvasHeight) * ((time * 0.5) % 1), canvasWidth, 3);
     }
 
     document.querySelectorAll('button[data-layer]').forEach(btn => {
